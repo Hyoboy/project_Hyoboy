@@ -2,6 +2,8 @@ import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
+from pandas import DataFrame
+import time
 
 class OpenApi(QAxWidget) :
     def __init__(self) :
@@ -15,16 +17,63 @@ class OpenApi(QAxWidget) :
         # 키움증권 로그인
         self.CommConnect()
         # 키움증권 계좌정보
-        self.account_info()
+        self.accountInfo()
+        # 테스트용 삼성전자 주가정보 호출
+        self.getDailyData()
 
-    def getLoginInfo(self, tag):
-        try:
+
+    # 데이터 세팅
+    def setData(self, id, val) :
+        self.dynamicCall("SetInputValue(QString, QString)", id, val)
+
+    # 종목코드 데이터 호출
+    def getTotalData(self, code, endDt) :
+        # 초기화
+        self.ohlcv = {'date': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': []}
+        # 호출할 데이터 세팅
+        self.setData("종목코드", code)
+        self.setData("기준일자", endDt)
+        self.setData("수정주가구분", 1)
+        self.commReqData("opt10081_req", "opt10081", 0, "0101")
+
+        # 왜 전체 데이터 호출이 안됨??
+        # while self.remained_data == True :
+        #     self.setData("종목코드", code)
+        #     self.setData("기준일자", endDt)
+        #     self.setData("수정주가구분", 1)
+        #     self.commReqData("opt10081_req", "opt10081", 2, "0101")
+
+        time.sleep(0.5)
+        # data 비어있는 경우
+        if len(self.ohlcv) == 0 :
+            return []
+
+        if self.ohlcv['date'] == '' :
+            return []
+
+        df = DataFrame(self.ohlcv, columns=['open', 'high', 'low', 'close', 'volume'], index=self.ohlcv['date'])
+
+        return df
+
+    def commReqData(self, rqname, trcode, next, screen_no) :
+        self.dynamicCall("CommRqData(QString, QString, int, QString)", rqname, trcode, next, screen_no)
+        self.tr_event_loop = QEventLoop()
+        self.tr_event_loop.exec_()
+
+    # 데이터 호출
+    def getDailyData(self) :
+        # 종목코드, 데이터 가져올 마지막 날짜
+        data = self.getTotalData('005930', '20211107')
+        print(data)
+
+    def getLoginInfo(self, tag) :
+        try :
             rtn = self.dynamicCall("GetLoginInfo(QString)", tag)
             return rtn
-        except Exception as e:
+        except Exception as e :
             print(e)
 
-    def account_info(self):
+    def accountInfo(self) :
         account_number = self.getLoginInfo('ACCNO')
         print(account_number)
         self.account_number = account_number.split(';')[0]
@@ -37,9 +86,59 @@ class OpenApi(QAxWidget) :
     def set_signal_slots(self) :
         try :
             self.OnEventConnect.connect(self.eventConnect)
+            self.OnReceiveTrData.connect(self.receiveTrData)
         except Exception as e :
             print(e)
         
+    def getCommData(self, code, field_name, index, item_name):
+        ret = self.dynamicCall("GetCommData(QString, QString, int, QString)", code, field_name, index, item_name)
+        return ret.strip()
+
+    def getRepeatCnt(self, trcode, rqname):
+        ret = self.dynamicCall("GetRepeatCnt(QString, QString)", trcode, rqname)
+        return ret
+
+    def opt10081(self, rqname, trcode) :
+        # 반복횟수 설정
+        ohlcvCnt = self.getRepeatCnt(trcode, rqname)
+        print(ohlcvCnt)
+        
+        # 데이터 추가
+        ohlcvCnt = 10
+        for i in range(ohlcvCnt) :
+            date = self.getCommData(trcode, rqname, i, "일자")
+            open = self.getCommData(trcode, rqname, i, "시가")
+            high = self.getCommData(trcode, rqname, i, "고가")
+            low = self.getCommData(trcode, rqname, i, "저가")
+            close = self.getCommData(trcode, rqname, i, "현재가")
+            volume = self.getCommData(trcode, rqname, i, "거래량")
+
+            self.ohlcv['date'].append(date)
+            self.ohlcv['open'].append(int(open))
+            self.ohlcv['high'].append(int(high))
+            self.ohlcv['low'].append(int(low))
+
+            self.ohlcv['close'].append(int(close))
+            self.ohlcv['volume'].append(int(volume))
+
+    # 데이터 호출 이벤트처리
+    def receiveTrData(self, screen_no, rqname, trcode, record_name, next, etc1, etc2, etc3, etc4) :
+        print(screen_no, rqname, trcode, record_name, next)
+
+        if next == '2' :
+            self.remained_data = True
+        else:
+            self.remained_data = False
+
+        # 이벤트 정리
+        if rqname == "opt10081_req" :
+            print('rqname : ' + rqname)
+            self.opt10081(rqname, trcode)
+
+        # 이벤트 종료
+        self.tr_event_loop.exit()
+
+
     # 로그인 이벤트처리
     def eventConnect(self, errCode) :
         if errCode == 0 :
