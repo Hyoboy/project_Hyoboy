@@ -29,7 +29,7 @@ class OpenApi(QAxWidget) :
     # 종목코드 데이터 호출
     def getTotalData(self, code, endDt) :
         # 초기화
-        self.ohlcv = {'date': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': []}
+        self.ohlcv = {'date' : [], 'open' : [], 'high' : [], 'low' : [], 'close' : [], 'volume' : []}
         # 호출할 데이터 세팅
         self.setData("종목코드", code)
         self.setData("기준일자", endDt)
@@ -37,11 +37,11 @@ class OpenApi(QAxWidget) :
         self.commReqData("opt10081_req", "opt10081", 0, "0101")
 
         # 왜 전체 데이터 호출이 안됨??
-        # while self.remained_data == True :
-        #     self.setData("종목코드", code)
-        #     self.setData("기준일자", endDt)
-        #     self.setData("수정주가구분", 1)
-        #     self.commReqData("opt10081_req", "opt10081", 2, "0101")
+        while self.remained_data == True :
+            self.setData("종목코드", code)
+            self.setData("기준일자", endDt)
+            self.setData("수정주가구분", 1)
+            self.commReqData("opt10081_req", "opt10081", 2, "0101")
 
         time.sleep(0.5)
         # data 비어있는 경우
@@ -57,12 +57,15 @@ class OpenApi(QAxWidget) :
 
     def commReqData(self, rqname, trcode, next, screen_no) :
         self.dynamicCall("CommRqData(QString, QString, int, QString)", rqname, trcode, next, screen_no)
+        # 딜레이 꼭 필요 없으면 데이터호출이 안되는 현상 (나중에 다시 공부)
+        time.sleep(0.5)
         self.tr_event_loop = QEventLoop()
         self.tr_event_loop.exec_()
 
     # 데이터 호출
     def getDailyData(self) :
         # 종목코드, 데이터 가져올 마지막 날짜
+        print('데이터 호출중입니다...')
         data = self.getTotalData('005930', '20211107')
         print(data)
 
@@ -75,7 +78,6 @@ class OpenApi(QAxWidget) :
 
     def accountInfo(self) :
         account_number = self.getLoginInfo('ACCNO')
-        print(account_number)
         self.account_number = account_number.split(';')[0]
         print('계좌번호 : ' + self.account_number)
 
@@ -101,10 +103,8 @@ class OpenApi(QAxWidget) :
     def opt10081(self, rqname, trcode) :
         # 반복횟수 설정
         ohlcvCnt = self.getRepeatCnt(trcode, rqname)
-        print(ohlcvCnt)
         
         # 데이터 추가
-        ohlcvCnt = 10
         for i in range(ohlcvCnt) :
             date = self.getCommData(trcode, rqname, i, "일자")
             open = self.getCommData(trcode, rqname, i, "시가")
@@ -123,7 +123,7 @@ class OpenApi(QAxWidget) :
 
     # 데이터 호출 이벤트처리
     def receiveTrData(self, screen_no, rqname, trcode, record_name, next, etc1, etc2, etc3, etc4) :
-        print(screen_no, rqname, trcode, record_name, next)
+        #print(screen_no, rqname, trcode, record_name, next)
 
         if next == '2' :
             self.remained_data = True
@@ -131,8 +131,8 @@ class OpenApi(QAxWidget) :
             self.remained_data = False
 
         # 이벤트 정리
+        #print('rqname : ' + rqname)
         if rqname == "opt10081_req" :
-            print('rqname : ' + rqname)
             self.opt10081(rqname, trcode)
 
         # 이벤트 종료
