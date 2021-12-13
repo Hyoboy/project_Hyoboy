@@ -43,9 +43,37 @@ dict() : 딕셔너리
     데이터 추가 : d['name'] = 'Hyoboy'
     데이터 삭제 : del d['name']
 
+    Key값만 가져오고싶을때
+    listKeys = d.keys()
+    Value값만 가져오고싶을때
+    listValues = d.values()
+
 슬라이싱 :
     a[0:4], a[:4] = 1번째 인덱스부터 출력할수있음
     a[3:], a[3:6] = 3번째 인덱스부터 호출도 가능
+
+DataFrame : 2차원 배열 데이터의 행렬
+    from pandas import DataFrame
+    f = {
+        'name' : ('신', '김', '안'),
+        'age' : ('20', '15', '35'),
+        'sex' : ('F', 'M', 'F')
+    }
+    데이터를 행렬화 시킬수있음 튜플, 리스트로도 이용가능
+    데이터 순서 변경도 가능
+    g = DataFrame(f, columns = ['age', 'sex', 'name'])
+
+    pInfo = DataFrame(f)
+    print(pInfo) 행렬화 시킨 데이터 전체 출력
+
+    iloc : 행, 열 단위로 DataFrame 데이터에 접근
+        pInfo.iloc(0,0) ----    '신' 
+        pInfo.iloc(1,1) ----    '15'
+
+    loc : iloc와 동일하게 DataFrame 데이터에 접근하지만 열의 경우 라벨명으로 접근.
+        pInfo.loc(0, 'name') ----   '신'
+        pInfo.loc(2, 'sex') ----    'F'
+
 '''
 
 # 반복문
